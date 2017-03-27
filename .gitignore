@@ -7,3 +7,5 @@
 /bigtalk/bigtalk/obj/Debug
 /bigtalk/bigtalk.Tests/obj/Debug
 /bigtalk/packages
+/bigtalk/talks/node_modules
+/talks/node_modules
