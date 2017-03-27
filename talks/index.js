@@ -2,7 +2,7 @@
     io = require('socket.io');
 
     var app = express();
-    app.use(express.static(__dirname)+"/www");
+    app.use(express.static(__dirname+"/www"));
     var server = app.listen(8888);
     var ws = io.listen(server);
 
