@@ -3,12 +3,14 @@ var gulp = require('gulp'),
     less = require('gulp-less'),                    //less处理插件
     autoprefixer = require('gulp-autoprefixer'),    //css自动补全
     imagemin = require('gulp-imagemin'),            //图片压缩
+    connect = require('gulp-connect'), //httpService服务
     cache = require('gulp-cache'),                  //缓存管理
     fileinclude = require('gulp-file-include'),     //文件替换管理
     uglify = require('gulp-uglify'),                //js压缩插件
     cssmin = require('gulp-clean-css'),             //css压缩
     rename = require("gulp-rename"),                //文件重命名
     del = require('del'),                           //删除文件
+    plumber=require("gulp-plumber"),
     jshint = require("gulp-jshint");                //js的语法检测
 
 
@@ -48,6 +50,7 @@ function setHtml(path) {
 }
 function setImage(path) {
     gulp.src(path)
+        .pipe(plumber())
         .pipe(cache(imagemin()))
         .pipe(gulp.dest('www/images'))
         .pipe(connect.reload());
@@ -61,7 +64,7 @@ gulp.task('connect', function () {
     connect.server({
         //host:'localhost',
         port: 8888,
-        root: 'testDecomposing/src/main/dist/',
+        root: 'src/',
         livereload: true
     });
 });
@@ -72,7 +75,15 @@ gulp.task('watch', function () {
     gulp.watch('src/css/*.less', function (event) {
         setCss(event.path);
     });
-  
+   gulp.watch('src/js/*.js', function (event) {
+        setJavascript(event.path);
+    });
+    gulp.watch('src/images/*.{png,jpg,gif,ico}', function (event) {
+        setImage(event.path);
+    });
+    gulp.watch('src/*.html', function (event) {
+        setHtml(event.path);
+    });
 });
 
 gulp.task('default', ['watch']); //定义默认任务
