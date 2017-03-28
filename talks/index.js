@@ -14,6 +14,7 @@
 	            client.emit('nickname', '昵称有重复!');
 	        }else{
 	            client.nickname = msg;
+	            client.emit('joined', msg);
 	            ws.sockets.emit('announcement', '系统', msg + ' 加入了聊天室!');
 	        }
 	    });

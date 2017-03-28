@@ -63,7 +63,7 @@ gulp.task('clean', function () {
 gulp.task('connect', function () {
     connect.server({
         //host:'localhost',
-        port: 8888,
+        port: 8889,
         root: 'src/',
         livereload: true
     });
