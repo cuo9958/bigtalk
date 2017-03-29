@@ -8,6 +8,7 @@
             margin: 0;
             padding: 0;
         }
+
         #message {
             position: fixed;
             left: 0;
@@ -15,9 +16,10 @@
             width: 100%;
             background: #fff;
             box-sizing: border-box;
-            display:none;
-            z-index:999;
+            display: none;
+            z-index: 999;
         }
+
             #message textarea {
                 float: left;
                 width: 80%;
@@ -25,6 +27,7 @@
                 border: none;
                 box-sizing: border-box;
             }
+
             #message button {
                 width: 20%;
                 height: 50px;
@@ -32,12 +35,18 @@
                 box-sizing: border-box;
                 float: right;
                 background: #5688B0;
-                color:#fff;
-                font-size:1.4rem;
+                color: #fff;
+                font-size: 1.4rem;
             }
+        /*loading层*/
+        #loadMask {
+        }
     </style>
 </head>
 <body>
+    <div id="loadMask">
+
+    </div>
     <div id="message">
         <textarea id="msg"></textarea><button id="btn" type="button">发送</button>
     </div>
@@ -45,46 +54,114 @@
     <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/16.3.5/Tween.min.js"></script>-->
     <script src="js/pixi.min.js"></script>
     <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/4.4.3/pixi.min.js"></script>-->
-    <script>
-        //第一段：初始化整个空间
-        var winWidth, winHeight,
-            messageBox = document.getElementById("message"),
-            messageBtn = document.getElementById("btn"),
-            messages=document.getElementById("msg");
-        // 获取窗口宽度
-        if (window.innerWidth)
-            winWidth = window.innerWidth;
-        else if ((document.body) && (document.body.clientWidth))
-            winWidth = document.body.clientWidth;
-        // 获取窗口高度
-        if (window.innerHeight)
-            winHeight = window.innerHeight;
-        else if ((document.body) && (document.body.clientHeight))
-            winHeight = document.body.clientHeight;
-        //画板
-        var renderer = PIXI.autoDetectRenderer(winWidth, winHeight);
-        document.body.appendChild(renderer.view);
-        //舞台
-        var stage = new PIXI.Container();
-        renderer.backgroundColor = 0x061639;
-        renderer.view.style.float = "left";
-        //先刷新起来
-        function gameLoop() {
-            requestAnimationFrame(gameLoop);
-            renderer.render(stage);
+    <script type="text/javascript">
+        //全局
+        var game = {
+            winWidth: 500,          //屏幕宽度
+            winHeight: 500,         //屏幕高度
+            messageBox: null,       //消息窗体外部
+            messageBtn: null,       //消息按钮
+            messages: null,         //消息内容框
+            renderer: null,          //渲染对象
+            stage: null,             //舞台
+            users: [],               //所有界面用户
+            myperson: null,          //我自己的人物
+
+            //初始化宽高
+            init: function () {
+                // 获取窗口宽度
+                if (window.innerWidth) this.winWidth = window.innerWidth;
+                else if ((document.body) && (document.body.clientWidth)) this.winWidth = document.body.clientWidth;
+                // 获取窗口高度
+                if (window.innerHeight) this.winHeight = window.innerHeight;
+                else if ((document.body) && (document.body.clientHeight)) this.winHeight = document.body.clientHeight;
+                //获取对应的控件
+                this.messageBox = document.getElementById("message");
+                this.messageBtn = document.getElementById("btn");
+                this.messages = document.getElementById("msg");
+                //初始化画板
+                this.renderer = PIXI.autoDetectRenderer(this.winWidth, this.winHeight, { backgroundColor: 0x061639 });
+                this.renderer.view.style.float = "left";
+                document.body.appendChild(this.renderer.view);
+                //附加事件
+                this.renderer.view.addEventListener("click", function (e) {
+                    console.log(e);
+                })
+                //初始化舞台
+                this.stage = new PIXI.Container();
+                console.log(this);
+                //启动loading项
+                this.loadImage();
+            },
+            //场景更新方法
+            loop: function () {
+                requestAnimationFrame(game.loop);
+                game.renderer.render(game.stage);
+            },
+            //加载资源
+            loadImage: function () {
+                console.log("加载页面");
+                var loadMask = new PIXI.Container();
+                var txt = new PIXI.Text("正在加载资源:0%", { fontFamily: "Arial", fontSize: 32, fill: "white" });
+                txt.x = game.winWidth / 2 - txt.width / 2;
+                txt.y = game.winHeight / 2 - txt.height / 2;
+                loadMask.addChild(txt);
+                game.stage.addChild(loadMask);
+                //加载事件
+                function loadProgressHandler(loader, resource) {
+                    txt.text = "正在加载资源:" + loader.progress + "%";
+                    console.log("loading: " + resource.url);
+                    console.log("progress: " + loader.progress + "%");
+                }
+                //开始加载
+                PIXI.loader.add("my", "images/my.jpg")
+                .add("cat", "images/cat.png")
+                .add("bg", "images/timg.jpg")
+                .on("progress", loadProgressHandler)
+                .load(game.connect);
+                //启动场景更新
+                this.loop();
+            },
+            //连接服务器
+            connect: function () {
+                //console.log("资源加载完成");
+                game.stage.removeChildren();
+                var ws = io.connect('http://127.0.0.1:8888');
+                //连接事件
+                ws.on('connect', function () {
+                    var nickname = prompt("请输入您的用户名");
+                    ws.emit('join', nickname);
+                });
+                //加入成功
+                ws.on("joined", function (userid, users) {
+                    console.log(userid);
+                    console.log(users);
+                    game.users = users;
+                    game.createPeople(userid);
+                });
+                //发送消息
+                ws.on('send.message', function (from, msg) {
+
+                });
+                //系统事件
+                ws.on('announcement', function (from, msg) {
+
+                });
+            },
+            //创建自己
+            createPeople: function (userid) {
+
+            }
+        };
+
+        window.onload = function () {
+            //执行初始化方法
+            game.init();
         }
-        gameLoop();
-    
+
         var sprite;
         //第二段加载
-        PIXI.loader
-        .add("my", "images/my.jpg")
-        //.on("progress", loadProgressHandler)
-        .load(setup);
-        function loadProgressHandler(loader, resource) {
-            console.log("loading: " + resource.url);
-            console.log("progress: " + loader.progress + "%");
-        }
+
         //第三段：初始化移动事件
         var ismove = false;
         window.addEventListener("keydown", function (e) {
@@ -113,7 +190,7 @@
                     messageBox.style.display = "block";
                     messages.focus();
                     break;
-                    
+
             }
         });
         window.addEventListener("keyup", function () {
@@ -123,10 +200,10 @@
             if (e.target.tagName != "CANVAS") return;
             messageBox.style.display = "none";
         });
-        
+
         //第四段：初始化socket
         function setup() {
-            var ws = io.connect('http://127.0.0.1:8888');
+
             messageBtn.addEventListener("click", function () {
                 messageBox.style.display = "none";
                 sendMsg(messages.value);
@@ -138,6 +215,7 @@
                 sprite.height = 50;
                 sprite.x = winWidth / 2 - 25;
                 sprite.y = winHeight / 2 - 25;
+
                 stage.addChild(sprite);
             }
 
@@ -155,49 +233,8 @@
                     stage.removeChild(txt);
                 }, 1000);
             }
-            var addMessage = function (from, msg) {
-            }
 
-            var send = function () {
-                sendMsg(msg);
-                // 添加消息到自己的内容区
-                addMessage('你', msg);
-            }
-            //连接事件
-            ws.on('connect', function () {
-                var nickname = prompt("请输入您的用户名");
-                ws.emit('join', nickname);
-            });
-
-            // 昵称有重复
-            ws.on('nickname', function () {
-                var nickname = prompt("请重新输入您的用户名");
-                ws.emit('join', nickname);
-            });
-            //加入成功
-            ws.on("joined", function (msg) {
-                createPerson(msg);
-            });
-            //发送消息
-            ws.on('send.message', function (from, msg) {
-                addMessage(from, msg);
-            });
-            //系统事件
-            ws.on('announcement', function (from, msg) {
-                addMessage(from, msg);
-            });
         }
-    </script>
-    <script type="text/javascript">
-
-        //var message = new PIXI.Text(
-        //  "Hello Pixi!",
-        //  { fontFamily: "Arial", fontSize: 32, fill: "white" }
-        //);
-        //message.x = 54;
-        //message.y = 96;
-
-        //stage.addChild(message);
     </script>
 </body>
 </html>
