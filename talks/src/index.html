@@ -85,7 +85,7 @@
                 this.messages = document.getElementById("msg");
                 this.game_border = document.getElementById("game_border");
                 //初始化画板
-                this.renderer = PIXI.autoDetectRenderer(this.winWidth, this.winHeight, { view: document.getElementById("game_box"), backgroundColor: 0x061639 });
+                this.renderer = PIXI.autoDetectRenderer(this.winWidth, this.winHeight, { transparent:true,view: document.getElementById("game_box"), backgroundColor: 0x061639 });
                 this.renderer.view.style.float = "left";
                 //附加事件
                 this.renderer.view.addEventListener("click", function (e) {
