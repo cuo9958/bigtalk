@@ -16,7 +16,6 @@
             width: 100%;
             background: #fff;
             box-sizing: border-box;
-            display: none;
             z-index: 999;
         }
 
@@ -44,6 +43,9 @@
     </style>
 </head>
 <body>
+    <div id="game_border">
+        <canvas id="game_box"></canvas>
+    </div>
     <div id="loadMask">
 
     </div>
@@ -59,13 +61,15 @@
         var game = {
             winWidth: 500,          //屏幕宽度
             winHeight: 500,         //屏幕高度
+            game_border:null,       //游戏界面的外框
             messageBox: null,       //消息窗体外部
             messageBtn: null,       //消息按钮
             messages: null,         //消息内容框
             renderer: null,          //渲染对象
             stage: null,             //舞台
             users: [],               //所有界面用户
-            myperson: null,          //我自己的人物
+            myperson: {},          //我自己的人物
+            ws: null,                //socket对象
 
             //初始化宽高
             init: function () {
@@ -79,13 +83,13 @@
                 this.messageBox = document.getElementById("message");
                 this.messageBtn = document.getElementById("btn");
                 this.messages = document.getElementById("msg");
+                this.game_border = document.getElementById("game_border");
                 //初始化画板
-                this.renderer = PIXI.autoDetectRenderer(this.winWidth, this.winHeight, { backgroundColor: 0x061639 });
+                this.renderer = PIXI.autoDetectRenderer(this.winWidth, this.winHeight, { view: document.getElementById("game_box"), backgroundColor: 0x061639 });
                 this.renderer.view.style.float = "left";
-                document.body.appendChild(this.renderer.view);
                 //附加事件
                 this.renderer.view.addEventListener("click", function (e) {
-                    console.log(e);
+                    document.body.focus();
                 })
                 //初始化舞台
                 this.stage = new PIXI.Container();
@@ -126,32 +130,136 @@
             connect: function () {
                 //console.log("资源加载完成");
                 game.stage.removeChildren();
-                var ws = io.connect('http://127.0.0.1:8888');
+                var ws= io.connect('http://127.0.0.1:8888');
                 //连接事件
                 ws.on('connect', function () {
-                    var nickname = prompt("请输入您的用户名");
-                    ws.emit('join', nickname);
+                    game.myperson.name = prompt("请输入您的用户名");
+                    game.myperson.x = game.winWidth / 2 - 25;
+                    game.myperson.y = game.winHeight / 2 - 25;
+                    ws.emit('join', game.myperson.name,game.myperson.x,game.myperson.y);
                 });
                 //加入成功
                 ws.on("joined", function (userid, users) {
                     console.log(userid);
                     console.log(users);
                     game.users = users;
+                    game.myperson = users[userid];
                     game.createPeople(userid);
                 });
-                //发送消息
-                ws.on('send.message', function (from, msg) {
-
+                //接收消息
+                ws.on('send.message', function (id,msg) {
+                    console.log(msg);
+                    var user = game.users[id].sprite;
+                    var txt = new PIXI.Text(msg, { fontFamily: "Arial", fontSize: 20, fill: "white" });
+                    txt.x = user.x ;
+                    txt.y = user.y - 25;
+                    game.stage.addChild(txt);
+                    var timer = setInterval(function () {
+                        txt.y--;
+                    }, 20);
+                    setTimeout(function () {
+                        clearInterval(timer);
+                        game.stage.removeChild(txt);
+                    }, 1000);
                 });
-                //系统事件
-                ws.on('announcement', function (from, msg) {
-
+                //移动事件
+                ws.on('moved', function (user) {
+                    var temp = game.users[user.id];
+                    temp.sprite.x = user.x;
+                    temp.sprite.y = user.y;
+                });
+                //系统事件离开
+                ws.on('leave', function (id) {
+                    game.stage.removeChild(game.users[id].sprite);
+                    delete game.users[id];
+                });
+                //新人加入事件
+                ws.on('add', function (user) {
+                    var temp = new PIXI.Sprite(PIXI.loader.resources["cat"].texture);
+                    temp.width = 50;
+                    temp.height = 50;
+                    temp.x = user.x;
+                    temp.y = user.y;
+                    temp.sessionid = user.id;
+                    user.sprite = temp;
+                    game.users[user.id] = user;
+                    game.stage.addChild(temp);
+                });
+                game.ws = ws;
+            },
+            //移动的时候发送移动事件
+            move: function (x, y) {
+                if (!game.ws || !game.ws.connected) return;
+                game.ws.emit("move",x,y);
+            },
+            //发送消息
+            sendMessage: function (msg) {
+                if (!game.ws || !game.ws.connected) return;
+                game.ws.emit("send.message", msg);
+            },
+            //创建自己和朋友
+            createPeople: function (userid) {
+                var sprite = new PIXI.Sprite(PIXI.loader.resources["my"].texture);
+                sprite.width = 50;
+                sprite.height = 50;
+                sprite.x = game.myperson.x;
+                sprite.y = game.myperson.y;
+                game.myperson.sprite = sprite;
+                game.stage.addChild(sprite);
+                for (var item in game.users) {
+                    var item_sprite = game.users[item];
+                    if (item_sprite.id != game.myperson.id) {
+                        var temp = new PIXI.Sprite(PIXI.loader.resources["cat"].texture);
+                        temp.width = 50;
+                        temp.height = 50;
+                        temp.x = item_sprite.x;
+                        temp.y = item_sprite.y;
+                        temp.sessionid = item_sprite.id;
+                        item_sprite.sprite = temp;
+                        game.stage.addChild(temp);
+                    }
+                }
+                game.createMoveEvent();
+            },
+            //创建移动事件
+            createMoveEvent: function () {
+                console.log("创建移动事件");
+                //键盘移动
+                window.addEventListener("keydown", function (e) {
+                    if (e.target.id == "msg") return;
+                    if (!game.myperson.sprite) return;
+                    var step = 5;
+                    switch (e.keyCode) {
+                        //上
+                        case 87:
+                            game.myperson.sprite.y -= step;
+                            break;
+                            //下
+                        case 83:
+                            game.myperson.sprite.y += step;
+                            break;
+                            //左
+                        case 65:
+                            game.myperson.sprite.x -= step;
+                            break;
+                            //右
+                        case 68:
+                            game.myperson.sprite.x += step;
+                            break;
+                            //回车去聊天
+                        case 13:
+                            
+                            break;
+                    }
+                    game.move(game.myperson.sprite.x, game.myperson.sprite.y);
+                });
+                //点击消息按钮
+                game.messageBtn.addEventListener("click", function () {
+                    var value = game.messages.value;
+                    game.sendMessage(value);
+                    game.messages.value = "";
                 });
             },
-            //创建自己
-            createPeople: function (userid) {
-
-            }
         };
 
         window.onload = function () {
@@ -159,82 +267,6 @@
             game.init();
         }
 
-        var sprite;
-        //第二段加载
-
-        //第三段：初始化移动事件
-        var ismove = false;
-        window.addEventListener("keydown", function (e) {
-            if (e.target.tagName != "BODY") return;
-            if (!sprite) return;
-            var step = 5;
-            switch (e.keyCode) {
-                //上
-                case 87:
-                    sprite.y -= step;
-                    break;
-                    //下
-                case 83:
-                    sprite.y += step;
-                    break;
-                    //左
-                case 65:
-                    sprite.x -= step;
-                    break;
-                    //右
-                case 68:
-                    sprite.x += step;
-                    break;
-                    //回车去聊天
-                case 13:
-                    messageBox.style.display = "block";
-                    messages.focus();
-                    break;
-
-            }
-        });
-        window.addEventListener("keyup", function () {
-            ismove = false;
-        });
-        window.addEventListener("click", function (e) {
-            if (e.target.tagName != "CANVAS") return;
-            messageBox.style.display = "none";
-        });
-
-        //第四段：初始化socket
-        function setup() {
-
-            messageBtn.addEventListener("click", function () {
-                messageBox.style.display = "none";
-                sendMsg(messages.value);
-                messages.value = "";
-            });
-            var createPerson = function (nickname) {
-                sprite = new PIXI.Sprite(PIXI.loader.resources["my"].texture);
-                sprite.width = 50;
-                sprite.height = 50;
-                sprite.x = winWidth / 2 - 25;
-                sprite.y = winHeight / 2 - 25;
-
-                stage.addChild(sprite);
-            }
-
-            var sendMsg = function (msg) {
-                ws.emit('send.message', msg);
-                var txt = new PIXI.Text(msg, { fontFamily: "Arial", fontSize: 32, fill: "white" });
-                txt.x = sprite.x;
-                txt.y = sprite.y;
-                stage.addChild(txt);
-                var timer = setInterval(function () {
-                    txt.y--;
-                }, 20);
-                setTimeout(function () {
-                    clearInterval(timer);
-                    stage.removeChild(txt);
-                }, 1000);
-            }
-
-        }
     </script>
 </body>
 </html>
