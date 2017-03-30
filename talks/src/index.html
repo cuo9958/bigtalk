@@ -93,6 +93,10 @@
                 })
                 //初始化舞台
                 this.stage = new PIXI.Container();
+                game.stage.interactive = true;
+                game.stage.click = function (e) {
+                    console.log("点击stage");
+                }
                 console.log(this);
                 //启动loading项
                 this.loadImage();
